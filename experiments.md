@@ -219,3 +219,34 @@ No changes after this point.
 - Top-10 error series ≈ 8% of error: client 38 over-forecast (ignored last year's Q4 dip), spiky/seasonal
   under-forecast (0_3_1154, 41_228_2866), young series extrapolated upward.
 - Nothing changed after scoring. Phase 2 untouched.
+
+## 2026-11-25: Final selection round (folds B–E) and Phase 2
+
+**Selection** (`python -m src.experiment_final`, `reports/final_round.md`). Folds B, C, D + E = Phase 1; fold A for
+reference only (smoothed prior-year holiday). Rule: best mean over B–E and beats frozen LightGBM on ≥ 3 of 4.
+
+| candidate | A (ref.) | B | C | D | E | mean B–E | wins |
+|---|---|---|---|---|---|---|---|
+| **frozen LightGBM** | 0.624 | 0.490 | 0.448 | 0.474 | 0.571 | 0.496 | – |
+| 0.7 LightGBM + 0.3 blend_0.25 | 0.660 | 0.480 | 0.455 | 0.481 | 0.529 | 0.486 | 2/4 |
+| routing (top 1% + lumpy → 0.5 blend) | 0.649 | 0.497 | 0.464 | 0.479 | 0.553 | 0.498 | 1/4 |
+| 0.5 LightGBM + 0.5 blend_0.25 | 0.691 | 0.536 | 0.467 | 0.490 | 0.509 | 0.500 | 1/4 |
+
+Chosen: **frozen LightGBM** (the 0.7 blend's better mean comes from Phase 1 alone; fails 3-of-4).
+Phase 1 refit reproduced the one-off forecast exactly (max abs diff 0.0).
+
+**Phase 2, run once** (`python -m src.run_phase2`, `reports/phase2.md`, 3 min, peak 4.8 GB). Cleaning re-run on
+Phase 0 + 1; 59 training origins 2021-07-05 → 2023-10-02; origin 2024-01-01.
+
+| method | score | accuracy | bias | signed bias |
+|---|---|---|---|---|
+| **frozen LightGBM** | **0.4879** | 0.4446 | 0.0433 | −4.3% |
+| blend_0.25 | 0.7844 | 0.5951 | 0.1894 | +18.9% |
+
+- VN1 leaderboard winner 0.4637 (official scoring removed stockout weeks; ours can't, so ours is harsher).
+- Baseline +19%: its MA13 carried the holiday level (~300k/week Oct–Dec) into a ~250k/week quarter.
+- Warehouse 68 / client 38 collapsed from ~20k to ~20 units/week in mid-December 2023: group level-shift event
+  (25/25 series, down) at the origin → restart → forecast 0, right for 10 of 13 weeks; it reopened mid-March
+  (15–26k/week), which explains most of the −6% to −14% in the last three weeks.
+- Segments: top 1% 0.454 (−9.8%), top 1–10% 0.435, rest 0.744; smooth 0.396, erratic 0.634, lumpy 1.155.
+- Summary of the whole forecast layer: `reports/forecast_layer_summary.md`. Nothing changed after scoring.

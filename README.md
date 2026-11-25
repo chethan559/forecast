@@ -1,7 +1,14 @@
 # zova-forecast
 
-Weekly demand forecasting pipeline for Zova. Stage 1: **data cleaning** of the VN1 competition data
-(no models yet).
+Weekly demand forecasting pipeline for Zova (inventory planning for DTC ecommerce brands), built and
+tested on the VN1 forecasting competition data: cleaning, baselines, a global LightGBM, a backtest harness,
+and one-off scored runs on Phase 1 and the sealed Phase 2.
+
+**Result:** VN1 score 0.571 on Phase 1 and **0.488 on Phase 2** (leaderboard winner 0.4637, scored without
+stockout weeks, so not like-for-like). Summary: `reports/forecast_layer_summary.md`; frozen config and
+evidence: `reports/final_config.md`; full log: `experiments.md`.
+
+The raw VN1 CSVs are not in the repo: put them in `data/raw/vn1/` and run `python -m src.run_cleaning`.
 
 ## Setup
 
@@ -53,6 +60,17 @@ Scores LightGBM (a grid of scale method × client/warehouse × training-origin s
 fold A covers the 2022 holidays). Features are cached per origin in `data/processed/features_cache/`.
 Results: `reports/backtest.md`, scores and forecasts in `outputs/backtest/`. Reads only `phase0_clean.parquet`.
 Takes roughly 20–30 minutes and up to ~5 GB of RAM.
+
+## Final selection and one-off scored runs
+
+```bash
+.venv/bin/python -m src.experiment_final   # candidates on folds B-E (E = Phase 1) -> reports/final_round.md
+.venv/bin/python -m src.run_phase1         # frozen config, scored once on Phase 1 -> reports/phase1.md
+.venv/bin/python -m src.run_phase2         # frozen config, scored once on Phase 2 -> reports/phase2.md
+```
+
+Both one-off runs check a frozen snapshot of the config and source (`outputs/phase*/frozen_config.json`)
+and refuse to run twice.
 
 ## Tests
 

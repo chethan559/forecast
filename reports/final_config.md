@@ -51,3 +51,28 @@ Definitions: `reports/features.md`.
 | blend_0.25 | 0.789 | 0.701 | 0.510 | 0.528 | 0.632 |
 
 Phase 1 (2023-10-09 → 2024-01-01) contains Thanksgiving and Christmas, so fold A is the closest rehearsal.
+
+---
+
+# Phase 2 freeze (2026-11-25)
+
+Final selection round (`reports/final_round.md`, `python -m src.experiment_final`) on folds B, C, D and
+E = Phase 1 (fold A reported only: its prior-year holiday is the smoothed 2021 data). Rule: best mean over
+B–E **and** beats frozen LightGBM on ≥ 3 of 4 folds, otherwise keep frozen LightGBM.
+
+| candidate | A (ref.) | B | C | D | E (Phase 1) | mean B–E | beats frozen |
+|---|---|---|---|---|---|---|---|
+| **frozen LightGBM (chosen)** | 0.624 | 0.490 | **0.448** | **0.474** | 0.571 | 0.496 | – |
+| 0.7 × LightGBM + 0.3 × blend_0.25 | 0.660 | **0.480** | 0.455 | 0.481 | 0.529 | **0.486** | 2/4 |
+| routing (top 1% + lumpy → 0.5 blend) | 0.649 | 0.497 | 0.464 | 0.479 | 0.553 | 0.498 | 1/4 |
+| 0.5 × LightGBM + 0.5 × blend_0.25 | 0.691 | 0.536 | 0.467 | 0.490 | **0.509** | 0.500 | 1/4 |
+| blend_0.25 (baseline) | 0.789 | 0.701 | 0.510 | 0.528 | 0.582 | 0.580 | – |
+
+**Decision: frozen LightGBM, unchanged** (`final.method = "lgbm"`). The 0.7 blend has the best mean, but its
+advantage comes almost entirely from Phase 1 (one holiday quarter); it loses on C and D, so it fails the
+3-of-4 rule. Phase 2 (Jan–Apr 2024) has no holiday, which is the regime where LightGBM alone did best (B–D).
+
+Phase 2 run (`python -m src.run_phase2`): cleaning re-run on Phase 0 + Phase 1 combined; training origins
+2021-07-05 → 2023-10-02 (every 2 weeks, all targets ≤ 2024-01-01); forecast origin 2024-01-01; forecasts
+2024-01-08 → 2024-04-01. Scored: frozen LightGBM and blend_0.25. Snapshot + source hashes:
+`outputs/phase2/frozen_config.json`.
