@@ -39,6 +39,34 @@ smooth 0.396, erratic 0.634, lumpy 1.155, intermittent 1.470.
 The baseline over-forecast Phase 2 by 19%: its moving average carried the Oct–Dec holiday level (~300k
 units/week) into a quarter that ran at ~250k. LightGBM handled the post-holiday drop.
 
+## Comparison with the VN1 competition (Phase 2)
+
+| entry | VN1 score | our gap |
+|---|---|---|
+| 1st place | 0.4637 | +0.024 |
+| TimeGPT, zero-shot (not an official entry) | 0.4651 | +0.023 |
+| 2nd place | 0.4657 | +0.022 |
+| 3rd place | 0.4758 | +0.012 |
+| 4th place | 0.4774 | +0.011 |
+| 5th place | 0.4808 | +0.007 |
+| **our frozen LightGBM** | **0.4879** | – |
+
+Source: the results table in Nixtla's nixtlar VN1 vignette, which gives places only, no team names. Scores
+below 5th are not published, so our exact rank is unknown: just outside the top 5 if the scoring is
+identical. We are 5.2% behind the winner and 1.5% behind 5th.
+
+- **Scoring may differ.** The vignette does not define the metric's handling of stockout weeks. Our Phase 2
+  actuals have no missing weeks (all 195,689 series-weeks are scored, zeros included). If the official
+  scoring removed stockout weeks, as noted when the task was set, our score is harsher than the
+  leaderboard's. Not verified; the competition page or Nixtla's reproduction scripts would settle it.
+- **Method gap.** The top five "used multiple models and carefully crafted features" with fine-tuning or
+  manual adjustment. Ours is one LightGBM with default parameters (100 trees), not tuned, and every choice
+  was fixed before Phase 2 was read.
+- **TimeGPT as a yardstick.** Zero-shot, no price data, leading zeros removed only: 0.4651. Most of our gap
+  is likely model capacity and tuning, not data preparation.
+- **Likely sources of the gap:** the top 1% of series (38.5% of units, −9.8% bias), warehouse 68's mid-March
+  reopening (most of the last three weeks' under-forecast), and no tuning or ensembling.
+
 ## Main lessons
 
 1. **The older history is smoothed.** Before 2022-08-29 the data looks like monthly totals spread evenly

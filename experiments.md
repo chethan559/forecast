@@ -250,3 +250,10 @@ Phase 0 + 1; 59 training origins 2021-07-05 → 2023-10-02; origin 2024-01-01.
   (15–26k/week), which explains most of the −6% to −14% in the last three weeks.
 - Segments: top 1% 0.454 (−9.8%), top 1–10% 0.435, rest 0.744; smooth 0.396, erratic 0.634, lumpy 1.155.
 - Summary of the whole forecast layer: `reports/forecast_layer_summary.md`. Nothing changed after scoring.
+
+## 2026-11-25: Comparison with the VN1 leaderboard
+
+Official Phase 2 results (Nixtla nixtlar vignette, places only): 1st 0.4637, 2nd 0.4657, 3rd 0.4758, 4th 0.4774,
+5th 0.4808; TimeGPT zero-shot 0.4651 (not an official entry). Ours 0.4879: just outside the top 5 if scoring is
+identical (lower places unpublished). Stockout-week handling of the official metric not verified; our actuals
+have no missing weeks. Added to `reports/forecast_layer_summary.md`.
