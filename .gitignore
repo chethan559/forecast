@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
+
+# Data: raw VN1 CSVs and everything derived from them (regenerate with python -m src.run_cleaning)
+data/raw/
+data/processed/
+
+# Model outputs: keep the small results (scores, decisions, frozen configs), drop forecasts and logs
+outputs/**/*.parquet
+outputs/**/*.log
+outputs/**/forecasts/

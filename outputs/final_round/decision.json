@@ -1,0 +1,41 @@
+{
+  "chosen": "lgbm",
+  "mean_B_E": {
+    "blend_0.25": 0.5801639440990474,
+    "lgbm": 0.4958314794604594,
+    "lgbm_w0.5": 0.5002818490113116,
+    "lgbm_w0.7": 0.48635696357489877,
+    "routing": 0.4980533672692921
+  },
+  "wins_vs_lgbm": {
+    "lgbm_w0.5": 1,
+    "lgbm_w0.7": 2,
+    "routing": 1
+  },
+  "best_candidate_by_mean": "lgbm_w0.7",
+  "eligible": [],
+  "fold_info": {
+    "A": {
+      "n_routed": 1369,
+      "train_rows": 2958841
+    },
+    "B": {
+      "n_routed": 1460,
+      "train_rows": 3732219
+    },
+    "C": {
+      "n_routed": 1592,
+      "train_rows": 4446205
+    },
+    "D": {
+      "n_routed": 1841,
+      "train_rows": 5374688
+    },
+    "E": {
+      "n_routed": 1934,
+      "train_rows": 6562256,
+      "max_abs_diff_vs_phase1_run": 0.0
+    }
+  },
+  "seconds": 230
+}

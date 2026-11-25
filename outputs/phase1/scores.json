@@ -1,0 +1,27 @@
+{
+  "total": {
+    "lgbm_final": {
+      "score": 0.5711712612959301,
+      "accuracy": 0.5118686527742733,
+      "bias": 0.05930260852165679,
+      "n": 195689,
+      "signed_bias": 0.05930260852165679
+    },
+    "blend_0.25": {
+      "score": 0.5815564957185151,
+      "accuracy": 0.5326723523013098,
+      "bias": 0.048884143417205234,
+      "n": 195689,
+      "signed_bias": -0.048884143417205234
+    }
+  },
+  "train_rows": 6562256,
+  "n_train_origins": 53,
+  "rows_dropped": 10570,
+  "cap_stats": {
+    "n_capped": 19641,
+    "share_capped": 0.10036844176218387,
+    "series_capped": 1533,
+    "units_removed_share": 0.0005635105280901499
+  }
+}

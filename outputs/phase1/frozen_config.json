@@ -1,0 +1,217 @@
+{
+ "config": {
+  "paths": {
+   "raw_dir": "/Users/chethankumar/inventory/zova-forecast/data/raw/vn1",
+   "processed_dir": "/Users/chethankumar/inventory/zova-forecast/data/processed",
+   "reports_dir": "/Users/chethankumar/inventory/zova-forecast/reports",
+   "files": {
+    "phase0_sales": "Phase 0 - Sales.csv",
+    "phase0_price": "Phase 0 - Price.csv",
+    "phase1_sales": "Phase 1 - Sales.csv",
+    "phase1_price": "Phase 1 - Price.csv",
+    "phase2_sales": "Phase 2 - Sales.csv"
+   }
+  },
+  "max_allowed_date": "2024-01-01",
+  "freq": "W-MON",
+  "smoothing": {
+   "min_run_length": 3,
+   "switch_date": null,
+   "switch_min_segment_weeks": 13
+  },
+  "price_shift": {
+   "window": 8,
+   "ratio_threshold": 2.5,
+   "min_periods": 4,
+   "ignore_prices_before": {
+    "0": "2022-08-29"
+   }
+  },
+  "relative_price": {
+   "window": 13,
+   "min_periods": 1
+  },
+  "stockout": {
+   "min_zero_run": 4,
+   "max_zero_run": 13,
+   "pre_window": 13,
+   "min_pre_mean": 2.0,
+   "min_pre_periods": 4,
+   "include_trailing_run": false
+  },
+  "level_shift": {
+   "short_window": 4,
+   "long_window": 13,
+   "ratio": 10.0,
+   "min_level": 5.0,
+   "cooldown_weeks": 13,
+   "group_keys": [
+    "warehouse",
+    "client"
+   ],
+   "group_share": 0.5,
+   "min_group_series": 5,
+   "restart_after_shift": true
+  },
+  "classification": {
+   "adi_threshold": 1.32,
+   "cv2_threshold": 0.49,
+   "new_series_weeks": 52,
+   "inactive_weeks": 13,
+   "from_date": null
+  },
+  "baselines": {
+   "h": 13,
+   "moving_avg_windows": [
+    4,
+    8,
+    13,
+    26
+   ],
+   "season_length": 52,
+   "fallback_window": 13,
+   "inactive_weeks": 13,
+   "volume_bands": [
+    0.01,
+    0.1
+   ],
+   "output_dir": "/Users/chethankumar/inventory/zova-forecast/outputs/baselines"
+  },
+  "features": {
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+   ],
+   "lags": [
+    1,
+    2,
+    4,
+    8,
+    13
+   ],
+   "roll_windows": [
+    4,
+    8,
+    13,
+    26,
+    52
+   ],
+   "max_window": 13,
+   "season_length": 52,
+   "scale_window": 13,
+   "scale_method": "max13_52",
+   "optional_features": [
+    "uplift"
+   ],
+   "scale_floor": 0.1,
+   "demand_type_window": 52,
+   "switch_date": "2022-08-29"
+  },
+  "splits": {
+   "origin_start": "2022-09-05",
+   "origin_step_weeks": 2,
+   "inner_valid_origin": "2023-07-03",
+   "phase1_forecast_origin": "2023-10-02"
+  },
+  "lgbm": {
+   "params": {
+    "objective": "tweedie",
+    "verbosity": -1,
+    "seed": 0,
+    "deterministic": true,
+    "force_col_wise": true
+   },
+   "weight_by_scale": true,
+   "use_ids": false,
+   "origins_setting": "full",
+   "forecast_cap_k": 3.0,
+   "bias_multiplier": 1.0
+  },
+  "lgbm_smoke": {
+   "objective": "tweedie",
+   "verbosity": -1,
+   "seed": 0
+  },
+  "backtest": {
+   "folds": {
+    "A": "2022-10-31",
+    "B": "2023-01-30",
+    "C": "2023-04-03",
+    "D": "2023-07-03"
+   },
+   "holiday_folds": [
+    "A"
+   ],
+   "origin_settings": {
+    "full": {
+     "start": "2021-07-05"
+    },
+    "weekly_only": {
+     "start": "2022-09-05"
+    }
+   },
+   "step_weeks": 2,
+   "step_weeks_before_switch": 2,
+   "lgbm_grid": {
+    "scale": [
+     "mean13",
+     "max13_52"
+    ],
+    "ids": [
+     true,
+     false
+    ],
+    "origins": [
+     "full",
+     "weekly_only"
+    ]
+   },
+   "blend_weights": [
+    0.25,
+    0.5,
+    0.75
+   ],
+   "seasonal_index_clip": [
+    0.25,
+    4.0
+   ],
+   "output_dir": "/Users/chethankumar/inventory/zova-forecast/outputs/backtest"
+  }
+ },
+ "source_sha256": {
+  "src/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "src/adapters/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "src/adapters/vn1.py": "e8b98d8db80db2ccf8b9261934d4293b8add6f7c19b8c44ed3620513fd029c84",
+  "src/backtest.py": "161dc6e631c1d039f4124504f08350d18624564e5df86ec27a8cc9bad5064de7",
+  "src/cleaning.py": "a8c3a5dde8a61adfb6529457c43374cc4d2085e99a2c0c8cc3e97f48bb72fbe1",
+  "src/config.py": "98517ad4f43242ab6b971c7dad3f2b95feea7d63c0d4ef7bc30acdcf75961332",
+  "src/evaluation.py": "383a8fd73bf836b3c31c3257e0aafef7baeb74ad4eafbec69f8440a0f289acfb",
+  "src/experiment_round2.py": "7dab6c18dfcc2d25c9c972947bfbc93f5b3c14d265200d914004fc71ce8b8a02",
+  "src/experiment_round3.py": "c9c16ced50a83b9c9da847530ec3fd16c8f3c69d07ca321baaaafc91961f0a3e",
+  "src/feature_cache.py": "7e3a919607cd37f830b6b11e644efb3be0ba71ad8f608c0b706c796672edc6e1",
+  "src/features.py": "e51bc59a7ff1d6e2cc4f6e03dadb41e87f44b4d38d38308cc7b816097bbd6562",
+  "src/freeze.py": "c51e51c9faba25b1b03b6b5e987869c531ca39402c7322ffe609cd235095d995",
+  "src/metrics.py": "ce540a53b67b97e04e2abc41df8ea1042e8c22deb955723fb56bc476d6a266e4",
+  "src/models/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "src/models/baselines.py": "7b24bc7315638d771fa5f3668ba406f38ffec7d61136d88fd391939a379c0f7f",
+  "src/models/lgbm.py": "18da239c000c41fe80786e8a47a0032be502c7658fceb04e791c64aeca9a4093",
+  "src/models/postprocess.py": "993c38949dd06e366ebf976cb64d0ef33ced0b84d1725fa46f28539835756da8",
+  "src/report.py": "4442b19e070bea986bb3a64afcbedff8e0767469ab4c4476c31d0a3e8dd9961e",
+  "src/run_baselines.py": "a0c7e6fdadac49b1930103d46e56c03cc4de5164b02d3b0b61a39ec8b887c51f",
+  "src/run_cleaning.py": "9e598d4e3fd3a99c621f49e408704cf7c1399c32e28ec63d7232364599c63762",
+  "src/run_features.py": "86837d10ad71fa3b02eb67537b8ac2f0a999aa1e34bcb0df798ace4a45244a94",
+  "src/run_phase1.py": "3b3157a728ca8fd94be895ecbac374d0487d00fc876aa3b17842737d653324da",
+  "src/splits.py": "6bf7184d7cb13cf6c5a123aaf1bfcfefb03ca814adc835453c516150d193806a"
+ }
+}

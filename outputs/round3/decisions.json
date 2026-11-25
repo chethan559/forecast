@@ -1,0 +1,18 @@
+{
+  "restart_after_shift": true,
+  "restart_mean_off": 0.515751553400657,
+  "restart_mean_on": 0.5089225424769459,
+  "bias_multiplier_adopted": false,
+  "bias_multiplier": 1.0,
+  "multiplier_fit_on_all_folds": 1.02,
+  "lofo_mean_with": 0.509842003431521,
+  "lofo_mean_without": 0.5089225424769459,
+  "final_backtest_scores": {
+    "A": 0.6235355133618761,
+    "B": 0.4904291261066848,
+    "C": 0.4478167419702745,
+    "D": 0.47390878846894835
+  },
+  "final_backtest_mean": 0.5089225424769459,
+  "seconds": 363
+}
