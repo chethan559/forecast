@@ -11,7 +11,7 @@ import pandas as pd
 
 from src.config import get_config
 from src.evaluation import complete_with_zeros, load_phase0, volume_band_at_origin
-from src.features import CATEGORICAL, feature_specs, make_features, model_features
+from src.features import categorical_features, feature_specs, make_features, model_features
 from src.metrics import vn1_score, vn1_score_by_group
 from src.models.baselines import moving_avg
 from src.splits import inner_validation_split
@@ -91,7 +91,7 @@ def run_smoke_test(X: pd.DataFrame, weekly: pd.DataFrame, split: dict, cfg: dict
 
     # Leak screen: rank correlation of each numeric feature with the scaled target (sample of train).
     sample = train[train["target"].notna()].sample(min(300_000, len(train)), random_state=0)
-    num = [c for c in feats if c not in CATEGORICAL]
+    num = [c for c in feats if c not in categorical_features(cfg)]
     corr = sample[num].corrwith(sample["target"], method="spearman").abs().sort_values(ascending=False)
     return {"lgbm": vn1_score(fc, actual, forecast_col="forecast"),
             "ma13": vn1_score(base, actual, forecast_col="forecast"),
@@ -130,7 +130,8 @@ def write_features_report(X, info, smoke, split, cfg, reports_dir):
         f"- Scale = mean of the last {cfg['features']['scale_window']} weeks at T (fallback: mean since first "
         f"sale; floor {cfg['features']['scale_floor']}). Target and features marked *scaled* are divided by it; "
         "unscaled copies are kept as `<name>_raw` (not model inputs).",
-        f"- Client 0 prices before {cfg['price_shift']['ignore_prices_before'].get(0)} are treated as missing.",
+        "- Untrusted prices treated as missing: "
+        + ("; ".join(f"{r['column']} = {r['value']} before {r['before']}" for r in cfg["price_rules"]["ignore"]) or "none") + ".",
         "- The weekly-data switch date (2022-08-29) is used as a fixed calendar constant for `smoothed_share_*`.",
         "",
         "## Dataset",

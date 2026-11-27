@@ -47,15 +47,15 @@ def check_frozen(cfg):
         raise SystemExit(f"Source changed since the freeze: {changed}")
 
 
-def build_training_data(cfg) -> pd.DataFrame:
+def build_training_data(cfg, work_dir=WORK) -> pd.DataFrame:
     """Phase 0 + Phase 1 from the raw CSVs, cleaned together with the frozen cleaning config."""
     f, raw = cfg["paths"]["files"], cfg["paths"]["raw_dir"]
     both = concat_phases(load_phase(raw, f["phase0_sales"], f["phase0_price"]),
                          load_phase(raw, f["phase1_sales"], f["phase1_price"]))
     clean, _ = run_cleaning(both, None, cfg)  # refuses anything after max_allowed_date (2024-01-01)
-    WORK.mkdir(parents=True, exist_ok=True)
-    clean.to_parquet(WORK / TRAIN_FILE, index=False)
-    return pd.read_parquet(WORK / TRAIN_FILE, columns=["unique_id", "client", "warehouse", "product", "ds", "y", "price_raw"])
+    work_dir.mkdir(parents=True, exist_ok=True)
+    clean.to_parquet(work_dir / TRAIN_FILE, index=False)
+    return pd.read_parquet(work_dir / TRAIN_FILE, columns=["unique_id", "client", "warehouse", "product", "ds", "y", "price_raw"])
 
 
 def main():

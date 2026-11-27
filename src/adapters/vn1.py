@@ -75,3 +75,11 @@ def concat_phases(*phases: pd.DataFrame) -> pd.DataFrame:
     n_series = out["unique_id"].nunique()
     _validate(out, n_series, out["ds"].nunique(), "concat")
     return out
+
+
+def load(cfg: dict, phases=("phase0",)) -> pd.DataFrame:
+    """Adapter entry point used by src.run: the configured phases (default: Phase 0 = training data)."""
+    f, raw = cfg["paths"]["files"], cfg["paths"]["raw_dir"]
+    phases = cfg["dataset"].get("adapter_args", {}).get("phases", list(phases))
+    frames = [load_phase(raw, f[f"{p}_sales"], f.get(f"{p}_price")) for p in phases]
+    return frames[0] if len(frames) == 1 else concat_phases(*frames)

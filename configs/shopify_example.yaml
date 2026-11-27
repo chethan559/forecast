@@ -1,0 +1,36 @@
+# Example: one DTC brand's Shopify orders export (Admin > Orders > Export > CSV).
+# Put the export at data/raw/shopify_example/orders_export.csv and adjust the dates below.
+
+dataset:
+  name: shopify_example
+  adapter: shopify_orders
+  adapter_args:
+    orders_file: orders_export.csv
+    exclude_financial_status: [refunded, partially_refunded, voided]
+    by_location: false        # true = one series per SKU x fulfilment location
+    drop_partial_last_week: true
+  hierarchy: [vendor]
+  item_column: null
+  group_level: vendor
+  calendar: au                # AU brand: Black Friday, Cyber Monday, Click Frenzy, Boxing Day, EOFY, Mother's/Father's Day
+
+paths:
+  raw_dir: data/raw/shopify_example
+  processed_dir: data/processed/shopify_example
+  reports_dir: reports/shopify_example
+  outputs_dir: outputs/shopify_example
+  artifacts_dir: artifacts/shopify_example
+
+smoothing:
+  enabled: false              # built from order lines, so weekly data is genuine
+
+stockout:
+  min_pre_mean: 1.0           # small brands sell fewer units per SKU than VN1 series
+
+level_shift:
+  min_group_series: 3
+
+backtest:
+  folds: {}                   # e.g. {F1: "2024-03-04", F2: "2024-06-03"}; each needs 13 weeks of data after it
+  origin_settings:
+    full: {start: null}       # null = one year after the first week in the export

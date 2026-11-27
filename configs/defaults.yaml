@@ -1,0 +1,113 @@
+# Generic defaults for every dataset. A dataset config (configs/<name>.yaml) is merged on top of this.
+# Thresholds are the ones validated on VN1 (see experiments.md); override per dataset when needed.
+
+dataset:
+  name: unnamed
+  adapter: null            # vn1 | m5 | shopify_orders | long_csv
+  adapter_args: {}
+  hierarchy: []            # optional grouping columns in the data, e.g. [client, warehouse] or [store_id]
+  item_column: null        # column that identifies the same product across locations (optional)
+  group_level: null        # hierarchy level used for group trend / share / uplift features (null = whole dataset)
+  calendar: us             # holiday calendar: us | au
+
+paths:
+  raw_dir: data/raw/unnamed
+  processed_dir: data/processed/unnamed
+  reports_dir: reports/unnamed
+  outputs_dir: outputs/unnamed
+  artifacts_dir: artifacts/unnamed
+
+max_allowed_date: null     # leakage guard: cleaning refuses data after this date (null = no guard)
+freq: W-MON
+
+smoothing:                 # "monthly totals spread over weeks" detection
+  enabled: true
+  min_run_length: 3
+  switch_date: null        # null = estimate from the data (changepoint on the repeat rate); or pin a date
+  switch_min_segment_weeks: 13
+
+price_shift:
+  window: 8
+  ratio_threshold: 2.5
+  min_periods: 4
+
+price_rules:
+  ignore: []               # list of {column, value, before}: prices of those rows before that date are not trusted
+
+relative_price:
+  window: 13
+  min_periods: 1
+
+stockout:
+  use_in_stock_column: true   # if the data has `in_stock`, use it instead of inferring stockouts
+  min_zero_run: 4
+  max_zero_run: 13
+  pre_window: 13
+  min_pre_mean: 2.0
+  min_pre_periods: 4
+  include_trailing_run: false
+
+level_shift:
+  short_window: 4
+  long_window: 13
+  ratio: 10.0
+  min_level: 5.0
+  cooldown_weeks: 13
+  group_keys: []           # hierarchy levels checked for group-wide shifts (default: dataset.hierarchy)
+  group_share: 0.5
+  min_group_series: 5
+  restart_after_shift: true
+
+classification:
+  adi_threshold: 1.32
+  cv2_threshold: 0.49
+  new_series_weeks: 52
+  inactive_weeks: 13
+  from_date: null
+
+baselines:
+  h: 13
+  moving_avg_windows: [4, 8, 13, 26]
+  season_length: 52
+  fallback_window: 13
+  inactive_weeks: 13
+  volume_bands: [0.01, 0.10]
+
+features:
+  horizons: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+  lags: [1, 2, 4, 8, 13]
+  roll_windows: [4, 8, 13, 26, 52]
+  max_window: 13
+  season_length: 52
+  scale_window: 13
+  scale_method: max13_52
+  optional_features: [uplift]
+  scale_floor: 0.1
+  demand_type_window: 52
+
+lgbm:
+  params: {objective: tweedie, verbosity: -1, seed: 0, deterministic: true, force_col_wise: true}
+  weight_by_scale: true
+  use_ids: false
+  origins_setting: full
+  forecast_cap_k: 3.0
+  bias_multiplier: 1.0
+
+intervals:                 # prediction ranges (p10 / p90), chosen in the interval experiment
+  method: conformal        # conformal | quantile_lgbm
+  lower: 0.1
+  upper: 0.9
+
+final:
+  method: lgbm
+  baseline: blend_0.25
+
+backtest:
+  folds: {}                # {name: origin date}; each fold forecasts the 13 weeks after its origin
+  holiday_folds: []
+  origin_settings:
+    full: {start: null}    # null = first week of data + one season (52 weeks)
+  step_weeks: 2
+  step_weeks_before_switch: 2
+  blend_weights: [0.25, 0.5, 0.75]
+  seasonal_index_clip: [0.25, 4.0]

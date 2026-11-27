@@ -1,0 +1,39 @@
+{
+  "chosen": "conformal",
+  "reason": "closest to 80% coverage",
+  "summary": [
+    {
+      "method": "conformal",
+      "coverage": 0.7725945016821159,
+      "below_p10": 0.11527820540911081,
+      "above_p90": 0.11212729290877332,
+      "relative_width": 1.6747175575972308
+    },
+    {
+      "method": "quantile_lgbm",
+      "coverage": 0.8698840048487042,
+      "below_p10": 0.027340732228181643,
+      "above_p90": 0.10277526292311417,
+      "relative_width": 1.370972903211079
+    }
+  ],
+  "p50_check": {
+    "B": {
+      "engine": 0.49042912610668477,
+      "reported": 0.4904291261066848
+    },
+    "C": {
+      "engine": 0.4478167419702745,
+      "reported": 0.4478167419702745
+    },
+    "D": {
+      "engine": 0.47390878846894835,
+      "reported": 0.47390878846894835
+    },
+    "E": {
+      "engine": 0.5711712612959301,
+      "reported": 0.5711712612959301
+    }
+  },
+  "seconds": 761
+}

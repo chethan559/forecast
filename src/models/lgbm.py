@@ -7,11 +7,9 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 
-ID_FEATURES = ("client", "warehouse")
-
-
-def select_features(features: list[str], use_ids: bool) -> list[str]:
-    return list(features) if use_ids else [f for f in features if f not in ID_FEATURES]
+def select_features(features: list[str], use_ids: bool, id_features=()) -> list[str]:
+    """All features, or all except the hierarchy ids (config dataset.hierarchy) when use_ids is false."""
+    return list(features) if use_ids else [f for f in features if f not in set(id_features)]
 
 
 def fit(train: pd.DataFrame, features: list[str], params: dict, weight_by_scale: bool = True,

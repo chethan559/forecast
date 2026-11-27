@@ -1,0 +1,33 @@
+# M5 (Walmart) daily sales, aggregated to Monday weeks by src/adapters/m5.py.
+# Data (not in the repo): Kaggle "M5 Forecasting - Accuracy" -> data/raw/m5/
+#   sales_train_evaluation.csv, calendar.csv, sell_prices.csv
+# Status: loads and validates only. No modelling has been run on M5 yet.
+
+dataset:
+  name: m5
+  adapter: m5
+  adapter_args:
+    sales_file: sales_train_evaluation.csv
+    calendar_file: calendar.csv
+    prices_file: sell_prices.csv
+    max_series: null          # e.g. 2000 for a quick look
+  hierarchy: [state_id, store_id, cat_id, dept_id]
+  item_column: item_id         # same item across stores
+  group_level: store_id
+  calendar: us
+
+paths:
+  raw_dir: data/raw/m5
+  processed_dir: data/processed/m5
+  reports_dir: reports/m5
+  outputs_dir: outputs/m5
+  artifacts_dir: artifacts/m5
+
+smoothing:
+  enabled: false              # M5 is true daily data aggregated by us: no smoothed era
+
+level_shift:
+  group_keys: [store_id]
+
+backtest:
+  folds: {}                   # set when M5 modelling starts

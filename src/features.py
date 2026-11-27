@@ -19,11 +19,12 @@ are not in MODEL_FEATURES).
 import numpy as np
 import pandas as pd
 
+from src import calendar as cal
 from src.cleaning import (add_relative_price, clean_price, detect_level_shifts, flag_price_level_shift,
                           flag_smoothed_weeks, flag_suspected_stockouts, group_shift_dates,
                           level_shift_group_events)
 
-BASE_COLUMNS = ["unique_id", "client", "warehouse", "product", "ds", "y", "price_raw"]
+CORE_COLUMNS = ["unique_id", "ds", "y", "price_raw"]
 FLAG_HISTORY_WEEKS = 80  # enough look-back for 52-week flag shares + 13-week stockout pre-window + runs
 WEEK = pd.Timedelta(weeks=1)
 
@@ -32,6 +33,9 @@ WEEK = pd.Timedelta(weeks=1)
 def feature_specs(cfg: dict) -> list[dict]:
     """Name, group and plain-English definition of every model feature (drives reports/features.md)."""
     f = cfg["features"]
+    d = cfg["dataset"]
+    grp = group_name(cfg)
+    calname = d["calendar"]
     specs = []
 
     def add(name, group, definition, scaled=False, optional=None):
@@ -54,26 +58,26 @@ def feature_specs(cfg: dict) -> list[dict]:
     add("seas_mean_3", "seasonality", "mean y over target week - 53 .. - 51 (available weeks only)", True)
     add("tw_week_of_year", "calendar", "ISO week number of the target week")
     add("tw_month", "calendar", "month of the target week (Monday date)")
-    add("tw_thanksgiving_week", "calendar", "target week contains US Thanksgiving (and Black Friday)")
-    add("tw_cyber_week", "calendar", "target week starts on Cyber Monday")
-    add("tw_christmas_week", "calendar", "target week contains 25 December")
+    for e in cal.event_names(calname):
+        add(f"tw_{e}_week", "calendar", cal.event_description(calname, e))
     # Optional seasonality features (off unless listed in config features.optional_features).
     add("ly_uplift_series", "seasonality (optional)",
         "series: mean y over target week -53..-51 / mean y over the 13 weeks ending at origin - 52 "
         "(last year's target weeks vs last year's level at the same point; NaN if no history then)", optional="uplift")
-    add("ly_uplift_client", "seasonality (optional)",
-        "same ratio on the client's total units (pools all its series, so less noisy)", optional="uplift")
-    add("tw_weeks_to_thanksgiving", "calendar (optional)",
-        "signed weeks from the target week to the nearest Thanksgiving week (clipped to ±13)", optional="holiday_distance")
-    add("tw_weeks_to_christmas", "calendar (optional)",
-        "signed weeks from the target week to the nearest Christmas week (clipped to ±13)", optional="holiday_distance")
-    add("prod_mean_13", "hierarchy", "same product summed over all its warehouses: mean weekly units, last 13 weeks", True)
-    add("client_trend_4_13", "hierarchy", "client total units: mean4 / mean13")
-    add("client_share_13", "hierarchy", "series units / client units over the last 13 weeks")
+    add(f"ly_uplift_{grp}", "seasonality (optional)",
+        f"same ratio on the {grp} total units (pools all its series, so less noisy)", optional="uplift")
+    for e in cal.distance_events(calname):
+        add(f"tw_weeks_to_{e}", "calendar (optional)",
+            f"signed weeks from the target week to the nearest {e} week (clipped to ±13)", optional="holiday_distance")
+    if d.get("item_column"):
+        add("prod_mean_13", "hierarchy",
+            f"same {d['item_column']} summed over all its locations: mean weekly units, last 13 weeks", True)
+    add(f"{grp}_trend_4_13", "hierarchy", f"{grp} total units: mean4 / mean13")
+    add(f"{grp}_share_13", "hierarchy", f"series units / {grp} units over the last 13 weeks")
     add("relative_price", "price", "price at T / median valid price of the 13 weeks before (past only, reset at detected shifts)")
     add("price_observed_share_13", "price", "share of the last 13 weeks with a trusted recorded price")
-    add("client", "categorical", "client id (categorical)")
-    add("warehouse", "categorical", "warehouse id (categorical)")
+    for col in d["hierarchy"]:
+        add(col, "categorical", f"{col} id (categorical; used only if lgbm.use_ids)")
     add("demand_type", "categorical", "Syntetos-Boylan class from ADI/CV2 over the last 52 weeks at T")
     add("smoothed_share_13", "data quality", "share of last 13 weeks in an identical run before the weekly switch")
     add("smoothed_share_52", "data quality", "same over the last 52 weeks")
@@ -95,9 +99,41 @@ def scaled_features(cfg: dict) -> list[str]:
     return [s["name"] for s in feature_specs(cfg) if s["scaled"]]
 
 
-CATEGORICAL = ["client", "warehouse", "demand_type"]
-ID_COLUMNS = ["unique_id", "origin", "h", "target_date", "product"]
 TARGET_COLUMNS = ["target", "target_raw"]  # never model inputs
+DEMAND_TYPES = ["smooth", "erratic", "intermittent", "lumpy", "no_sales"]
+
+
+def group_name(cfg: dict) -> str:
+    """Hierarchy level used for group features (e.g. 'client'); 'all' = the whole dataset is one group."""
+    return cfg["dataset"].get("group_level") or "all"
+
+
+def id_features(cfg: dict) -> list[str]:
+    """Hierarchy id columns that can be model features (dropped when lgbm.use_ids is false)."""
+    return list(cfg["dataset"]["hierarchy"])
+
+
+def categorical_features(cfg: dict) -> list[str]:
+    return id_features(cfg) + ["demand_type"]
+
+
+def meta_columns(cfg: dict) -> list[str]:
+    """Hierarchy + item columns carried through as series attributes."""
+    d = cfg["dataset"]
+    return list(dict.fromkeys(list(d["hierarchy"]) + ([d["item_column"]] if d.get("item_column") else [])))
+
+
+def id_columns(cfg: dict) -> list[str]:
+    item = cfg["dataset"].get("item_column")
+    return ["unique_id", "origin", "h", "target_date"] + ([item] if item else [])
+
+
+def base_columns(cfg: dict, df: pd.DataFrame | None = None) -> list[str]:
+    """Raw input columns the features may use (in_stock only if present)."""
+    cols = CORE_COLUMNS + meta_columns(cfg)
+    if df is not None and "in_stock" in df.columns:
+        cols = cols + ["in_stock"]
+    return list(dict.fromkeys(cols))
 
 
 # ----------------------------------------------------------------------------- helpers
@@ -111,17 +147,8 @@ def safe_div(a, b):
 
 
 def us_holiday_weeks(years) -> dict[str, set]:
-    """Monday dates of Thanksgiving week, Cyber week and Christmas week for each year."""
-    out = {"thanksgiving": set(), "cyber": set(), "christmas": set()}
-    for y in years:
-        nov1 = pd.Timestamp(year=y, month=11, day=1)
-        thanksgiving = nov1 + pd.Timedelta(days=(3 - nov1.day_of_week) % 7 + 21)  # 4th Thursday
-        tg_monday = thanksgiving - pd.Timedelta(days=3)
-        out["thanksgiving"].add(tg_monday)
-        out["cyber"].add(tg_monday + WEEK)  # the week that starts on Cyber Monday
-        xmas = pd.Timestamp(year=y, month=12, day=25)
-        out["christmas"].add(xmas - pd.Timedelta(days=xmas.day_of_week))
-    return out
+    """Monday dates of Thanksgiving week, Cyber week and Christmas week (kept for older callers)."""
+    return cal.event_weeks("us", years)
 
 
 def _nan_window(W: np.ndarray, k: int):
@@ -148,7 +175,8 @@ def _trim(hist: pd.DataFrame) -> pd.DataFrame:
 # ----------------------------------------------------------------------------- level-shift restart
 def group_shift_dates_upto(weekly: pd.DataFrame, T, cfg: dict) -> pd.DataFrame:
     """(unique_id, shift_ds) of warehouse/client level-shift events detected from data <= T."""
-    hist = _trim(weekly[weekly["ds"] <= pd.Timestamp(T)][["unique_id", "client", "warehouse", "ds", "y"]])
+    cols = ["unique_id", "ds", "y"] + list(cfg["dataset"]["hierarchy"])
+    hist = _trim(weekly[weekly["ds"] <= pd.Timestamp(T)][cols])
     d = detect_level_shifts(hist.copy(), cfg)
     return group_shift_dates(d, level_shift_group_events(d, cfg), cfg)
 
@@ -182,11 +210,14 @@ def drop_rows_crossing_shift(train: pd.DataFrame, dates: pd.DataFrame) -> pd.Dat
 # ----------------------------------------------------------------------------- per-origin features
 def _price_at_origin(recent: pd.DataFrame, T: pd.Timestamp, cfg: dict) -> pd.DataFrame:
     """relative_price at T and trusted-price share over 13 weeks, from data <= T only."""
-    d = clean_price(recent[["unique_id", "client", "ds", "y", "price_raw"]].rename(columns={"price_raw": "price"}))
-    # Untrusted prices (client 0 before its cut-off date) become missing, then re-forward-fill.
+    rules = cfg["price_rules"]["ignore"]
+    keep = list(dict.fromkeys(["unique_id", "ds", "y", "price_raw"] + [r["column"] for r in rules]))
+    d = clean_price(recent[keep].rename(columns={"price_raw": "price"}))
+    # Untrusted prices (config price_rules.ignore, e.g. VN1 client 0 before 2022-08-29) become missing,
+    # then re-forward-fill.
     ignore = pd.Series(False, index=d.index)
-    for client, date in cfg["price_shift"].get("ignore_prices_before", {}).items():
-        ignore |= d["client"].eq(client) & d["ds"].lt(pd.Timestamp(date))
+    for r in rules:
+        ignore |= d[r["column"]].eq(r["value"]) & d["ds"].lt(pd.Timestamp(r["before"]))
     d.loc[ignore, "price_valid"] = np.nan
     d["price_trusted"] = d["price_valid"].notna()
     d["price_clean"] = d["price_valid"].groupby(d["unique_id"]).ffill()
@@ -203,9 +234,9 @@ def _flags_at_origin(recent: pd.DataFrame, T: pd.Timestamp, cfg: dict) -> pd.Dat
     Recomputing matters: in the cleaned file a zero run that started before T and ended after T is
     a 'closed' run (so possibly a stockout), but at T nobody knows yet whether it will end.
     """
-    c = {**cfg, "smoothing": {**cfg["smoothing"], "switch_date": cfg["features"]["switch_date"]}}
-    d, _ = flag_smoothed_weeks(recent[["unique_id", "ds", "y"]].copy(), c)
-    d = flag_suspected_stockouts(d, c)
+    cols = ["unique_id", "ds", "y"] + (["in_stock"] if "in_stock" in recent.columns else [])
+    d, _ = flag_smoothed_weeks(recent[cols].copy(), cfg)  # pinned switch date, or estimated on data <= T
+    d = flag_suspected_stockouts(d, cfg)
     out = {}
     for k in (13, 52):
         w = d[d["ds"] > T - k * WEEK].groupby("unique_id")
@@ -237,7 +268,8 @@ def _features_at_origin(base: pd.DataFrame, T: pd.Timestamp, horizons, cfg: dict
     ids = pd.Index(hist["unique_id"].unique()).sort_values()  # series with first sale <= T
     if len(ids) == 0:
         return pd.DataFrame()
-    meta = hist.groupby("unique_id")[["client", "warehouse", "product"]].first().reindex(ids)
+    meta = hist.groupby("unique_id")[meta_columns(cfg)].first().reindex(ids)
+    grp = group_name(cfg)
 
     # Wide matrix of the last L+1 weeks: column j is week T - (L - j); last column = T.
     # NaN = before first sale (not zero demand).
@@ -284,12 +316,15 @@ def _features_at_origin(base: pd.DataFrame, T: pd.Timestamp, horizons, cfg: dict
 
     # Hierarchy (at T). Sums treat pre-first-sale weeks as 0 units.
     sum13 = np.nansum(W[:, -13:], axis=1)
-    client = meta["client"].to_numpy()
-    s["prod_mean_13"] = pd.Series(sum13 / 13, index=ids).groupby(meta["product"]).transform("sum")
-    cw = pd.DataFrame(np.nan_to_num(W[:, -13:]), index=ids).groupby(client).sum()  # client x 13 weeks
-    client_trend = pd.Series(safe_div(cw.iloc[:, -4:].mean(axis=1), cw.mean(axis=1)), index=cw.index)
-    s["client_trend_4_13"] = client_trend.reindex(client).to_numpy()
-    s["client_share_13"] = safe_div(sum13, cw.sum(axis=1).reindex(client).to_numpy())
+    # `group` = the configured group level per series (VN1: client); one group if none is configured.
+    group = meta[grp].to_numpy() if grp in meta.columns else np.zeros(len(ids), dtype=int)
+    item = cfg["dataset"].get("item_column")
+    if item:
+        s["prod_mean_13"] = pd.Series(sum13 / 13, index=ids).groupby(meta[item]).transform("sum")
+    cw = pd.DataFrame(np.nan_to_num(W[:, -13:]), index=ids).groupby(group).sum()  # group x 13 weeks
+    group_trend = pd.Series(safe_div(cw.iloc[:, -4:].mean(axis=1), cw.mean(axis=1)), index=cw.index)
+    s[f"{grp}_trend_4_13"] = group_trend.reindex(group).to_numpy()
+    s[f"{grp}_share_13"] = safe_div(sum13, cw.sum(axis=1).reindex(group).to_numpy())
 
     # Recomputed flags and price features use a bounded recent history (all <= T).
     recent = hist[hist["ds"] > T - FLAG_HISTORY_WEEKS * WEEK]
@@ -315,14 +350,15 @@ def _features_at_origin(base: pd.DataFrame, T: pd.Timestamp, horizons, cfg: dict
     td = rows["target_date"]
     rows["tw_week_of_year"] = td.dt.isocalendar().week.astype(int).to_numpy()
     rows["tw_month"] = td.dt.month
-    hol = us_holiday_weeks(range(td.dt.year.min(), td.dt.year.max() + 1))
-    rows["tw_thanksgiving_week"] = td.isin(hol["thanksgiving"]).astype(int)
-    rows["tw_cyber_week"] = td.isin(hol["cyber"]).astype(int)
-    rows["tw_christmas_week"] = td.isin(hol["christmas"]).astype(int)
+    calname = cfg["dataset"]["calendar"]
+    hol = cal.event_weeks(calname, range(td.dt.year.min(), td.dt.year.max() + 1))
+    for e, weeks in hol.items():
+        rows[f"tw_{e}_week"] = td.isin(weeks).astype(int)
 
-    # Signed distance (weeks) to the nearest Thanksgiving / Christmas week, clipped.
-    hol_wide = us_holiday_weeks(range(td.dt.year.min() - 1, td.dt.year.max() + 2))
-    for key, col in [("thanksgiving", "tw_weeks_to_thanksgiving"), ("christmas", "tw_weeks_to_christmas")]:
+    # Signed distance (weeks) to the nearest occurrence of the main events, clipped.
+    hol_wide = cal.event_weeks(calname, range(td.dt.year.min() - 1, td.dt.year.max() + 2))
+    for key in cal.distance_events(calname):
+        col = f"tw_weeks_to_{key}"
         anchors = np.array(sorted(hol_wide[key]), dtype="datetime64[ns]")
         d = (anchors[None, :] - td.to_numpy()[:, None]).astype("timedelta64[D]").astype(int) // 7
         rows[col] = np.clip(d[np.arange(len(d)), np.abs(d).argmin(axis=1)], -13, 13)
@@ -331,11 +367,11 @@ def _features_at_origin(base: pd.DataFrame, T: pd.Timestamp, horizons, cfg: dict
     # Every week used is <= T (h + 1 <= L), so no future data.
     ly_level = _row_stat(W_ext[:, 1:EXTRA + 1], np.nanmean)  # W_ext column j = week T-(L+EXTRA-j): 1..13 = T-64..T-52
     rows["ly_uplift_series"] = safe_div(rows["seas_mean_3"].to_numpy(float), ly_level[ri])
-    C = pd.DataFrame(np.nan_to_num(W_ext), index=ids).groupby(client).sum().to_numpy()  # client x weeks
-    cidx = pd.Index(sorted(set(client))).get_indexer(client)
+    C = pd.DataFrame(np.nan_to_num(W_ext), index=ids).groupby(group).sum().to_numpy()  # group x weeks
+    cidx = pd.Index(sorted(set(group))).get_indexer(group)
     c_level = C[:, 1:EXTRA + 1].mean(axis=1)
     c_num = np.stack([C[:, EXTRA + hh_ + d] for hh_ in hs for d in (-1, 0, 1)], axis=1).reshape(len(C), len(hs), 3).mean(axis=2)
-    rows["ly_uplift_client"] = safe_div(c_num[cidx[ri], np.tile(np.arange(len(hs)), len(ids))], c_level[cidx[ri]])
+    rows[f"ly_uplift_{grp}"] = safe_div(c_num[cidx[ri], np.tile(np.arange(len(hs)), len(ids))], c_level[cidx[ri]])
 
     # Sales-based features are stored unscaled under `<name>_raw`; apply_scaling() makes the scaled ones.
     rows = rows.rename(columns={c: f"{c}_raw" for c in scaled_features(cfg)})
@@ -364,15 +400,17 @@ def make_raw_features(weekly_clean: pd.DataFrame, origins, horizons=range(1, 14)
     if config is None:
         from src.config import get_config
         config = get_config()
-    missing = [c for c in BASE_COLUMNS if c not in weekly_clean.columns]
+    weekly_clean = weekly_clean if "price_raw" in weekly_clean.columns else weekly_clean.assign(price_raw=np.nan)
+    cols = base_columns(config, weekly_clean)
+    missing = [c for c in cols if c not in weekly_clean.columns]
     if missing:
         raise ValueError(f"missing input columns: {missing}")
-    base = weekly_clean[BASE_COLUMNS].sort_values(["unique_id", "ds"], kind="stable").reset_index(drop=True)
+    base = weekly_clean[cols].sort_values(["unique_id", "ds"], kind="stable").reset_index(drop=True)
 
     frames = []
     for T in origins:
         fr = _features_at_origin(base, pd.Timestamp(T), horizons, config)
-        num = fr.select_dtypes("number").columns.difference(["h", "client", "warehouse", "product"])
+        num = fr.select_dtypes("number").columns.difference(["h"] + meta_columns(config))
         frames.append(fr.astype({c: "float32" for c in num}))  # halves memory
     out = pd.concat(frames, ignore_index=True)
     out["h"] = out["h"].astype("int16")
@@ -400,18 +438,23 @@ def apply_scaling(raw: pd.DataFrame, config: dict, method: str | None = None, ke
     return raw
 
 
-def set_categories(df: pd.DataFrame, categories: dict | None = None) -> dict:
+def _cat_values(s: pd.Series) -> pd.Series:
+    """Integer ids stay integers (VN1); anything else is compared as text."""
+    return s.astype(int) if pd.api.types.is_numeric_dtype(s) else s.astype(str)
+
+
+def set_categories(df: pd.DataFrame, cfg: dict, categories: dict | None = None) -> dict:
     """Convert categoricals in place with FIXED category lists (train and predict must match).
 
     categories=None: derive them from df (use on training rows) and return them for reuse.
     Unseen values at predict time become NaN, which LightGBM treats as missing.
     """
     if categories is None:
-        categories = {"client": sorted(pd.unique(df["client"].astype(int))),
-                      "warehouse": sorted(pd.unique(df["warehouse"].astype(int))),
-                      "demand_type": ["smooth", "erratic", "intermittent", "lumpy", "no_sales"]}
+        categories = {c: sorted(pd.unique(_cat_values(df[c]))) for c in id_features(cfg) if c in df.columns}
+        categories["demand_type"] = list(DEMAND_TYPES)
     for c, cats in categories.items():
-        df[c] = pd.Categorical(df[c].astype(int) if c != "demand_type" else df[c].astype(str), categories=cats)
+        vals = df[c].astype(str) if c == "demand_type" else _cat_values(df[c])
+        df[c] = pd.Categorical(vals.where(vals.isin(cats)), categories=cats)  # unseen -> NaN (missing)
     return categories
 
 
@@ -422,10 +465,10 @@ def make_features(weekly_clean: pd.DataFrame, origins, horizons=range(1, 14), co
         from src.config import get_config
         config = get_config()
     out = apply_scaling(make_raw_features(weekly_clean, origins, horizons, config), config, scale_method)
-    for c in CATEGORICAL:
+    for c in categorical_features(config):
         out[c] = out[c].astype("category")
     raw = [f"{c}_raw" for c in scaled_features(config)]
     all_feats = [sp["name"] for sp in feature_specs(config)]  # includes optional ones (model picks via model_features)
-    cols = dict.fromkeys(ID_COLUMNS + all_feats + ["scale", "scale_mean13", "scale_max13_52"]
+    cols = dict.fromkeys(id_columns(config) + all_feats + ["scale", "scale_mean13", "scale_max13_52"]
                          + raw + TARGET_COLUMNS)  # h is both id and feature
     return out[list(cols)]

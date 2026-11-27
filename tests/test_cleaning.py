@@ -57,7 +57,7 @@ def test_switch_date_estimated_from_repeat_rate():
         weekly = rng.poisson(20, 40) + 1
         series[f"0_1_{i}"] = list(monthly) + list(weekly)
     df = make_panel(series)
-    out, info = flag_smoothed_weeks(df, get_config())
+    out, info = flag_smoothed_weeks(df, get_config({"smoothing": {"switch_date": None}}))  # unpinned: estimate
     assert info["switch_date"] == pd.Timestamp("2023-01-02") + pd.Timedelta(weeks=40)
 
 

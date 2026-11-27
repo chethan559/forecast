@@ -257,3 +257,43 @@ Official Phase 2 results (Nixtla nixtlar vignette, places only): 1st 0.4637, 2nd
 5th 0.4808; TimeGPT zero-shot 0.4651 (not an official entry). Ours 0.4879: just outside the top 5 if scoring is
 identical (lower places unpublished). Stockout-week handling of the official metric not verified; our actuals
 have no missing weeks. Added to `reports/forecast_layer_summary.md`.
+
+## 2026-11-27: Reusable forecasting engine (no new modelling)
+
+**What was built**
+- `configs/defaults.yaml` + `configs/vn1.yaml` (all VN1 thresholds, dates, the client 0 price rule, the pinned
+  smoothed-era date, folds, decisions); `src/config.py` is now a YAML loader (`get_config()` = VN1). Added PyYAML.
+- `src/schema.py`: standard input (`unique_id, ds` Monday, `y`; optional `price`, `in_stock`, hierarchy columns)
+  with clear validation errors (missing columns, non-Mondays, negatives, duplicates, gaps, changing hierarchy).
+- Generalised code: hierarchy levels, item column and group level come from config (`dataset.*`); group features
+  are named after the group level (VN1: `client_trend_4_13`, ... unchanged); price-trust rules are a config list;
+  smoothed-era detection can be switched off or run automatically (VN1 pins the detected 2022-08-29);
+  `in_stock` replaces inferred stockouts when present; the seasonal-index baseline uses the group level.
+- `src/calendar.py`: US (Thanksgiving, Cyber week, Christmas) and AU (Black Friday, Cyber Monday, Click Frenzy
+  = 2nd Tuesday of November, Christmas, Boxing Day, EOFY = weeks touching June, Mother's Day, Father's Day).
+- `src/engine.py`: `fit` → artifact (LightGBM text models + meta.json with version, source hash, features,
+  categories, config; conformal table); `predict` → `unique_id, ds, p50, p10, p90`; `backtest` → report.
+- Adapters: `m5.py` (daily → Monday weeks, partial weeks dropped, day-weighted Walmart-week prices),
+  `shopify_orders.py` (line items → weekly units per SKU; refunded / partially refunded / voided / cancelled
+  orders excluded; gaps filled with 0; partial last week dropped), `long_csv.py` (column mapping).
+  Configs `configs/m5.yaml`, `configs/shopify_example.yaml` (AU calendar). M5 checked on a synthetic M5-format
+  fixture only (real M5 files are not in the repo); no M5 modelling.
+- `src/run.py`: `python -m src.run --config configs/<name>.yaml --stage clean|backtest|fit|predict`.
+- Tests: 109 (+2 slow). Slow regression (`pytest -m slow`): VN1 Phase 1 = 0.5711712613 and Phase 2 =
+  0.4878877058 reproduce exactly (plus blend_0.25 0.5816 / 0.7844).
+
+**Prediction intervals** (`python -m src.experiment_intervals`, `reports/intervals.md`, 13 min, peak 4.4 GB).
+Folds B, C, D + E (Phase 1). Engine p50 reproduced every frozen fold score exactly.
+
+| method | B | C | D | E | mean coverage | mean relative width |
+|---|---|---|---|---|---|---|
+| **conformal** (13-week calibration window, band × horizon) | 82.8% | 73.8% | 80.9% | 71.6% | **77.3%** | 1.67 |
+| quantile LightGBM (alpha 0.1 / 0.9) | 85.6% | 86.4% | 87.1% | 88.9% | 87.0% | **1.37** |
+
+- Rule (closest to 80%; narrower if both within 3 points): **conformal** (2.7 points off vs 7.0).
+  `intervals.method: conformal` in the configs.
+- Caveats: conformal under-covers the holiday quarter (71.6%: calibrated on Jul–Sep) and gives the top 1%
+  too-wide intervals (96% coverage): with ~150 series it falls below the 200-row minimum per group and uses
+  horizon-level residuals dominated by small series. Quantile LightGBM is narrower and steadier but
+  over-covers, mostly at the bottom (2.7% below p10). Candidate next steps: lower the conformal group minimum,
+  calibrate on the same season last year, or a conformal correction on top of the quantile models.

@@ -32,7 +32,7 @@ def test_weekly_only_has_no_origins_for_holiday_fold():
 def test_wider_step_before_switch_thins_only_old_origins():
     cfg = get_config({"backtest": {"step_weeks_before_switch": 4}})
     o = training_origins("2021-07-05", "2023-07-03", cfg)
-    switch = pd.Timestamp(cfg["features"]["switch_date"])
+    switch = pd.Timestamp(cfg["smoothing"]["switch_date"])
     old, new = [t for t in o if t < switch], [t for t in o if t >= switch]
     assert all(b - a == 4 * WEEK for a, b in zip(old, old[1:]))
     assert all(b - a == 2 * WEEK for a, b in zip(new, new[1:]))

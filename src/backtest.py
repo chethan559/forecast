@@ -19,8 +19,8 @@ import pandas as pd
 from src.config import get_config
 from src.evaluation import actuals_after, complete_with_zeros, load_phase0, volume_band_at_origin
 from src.feature_cache import build_cache, load_origins
-from src.features import (apply_scaling, drop_rows_crossing_shift, group_shift_dates_upto, model_features,
-                          set_categories)
+from src.features import (apply_scaling, drop_rows_crossing_shift, group_shift_dates_upto, id_features,
+                          model_features, set_categories)
 from src.metrics import vn1_score, vn1_score_by_group
 from src.models import lgbm
 from src.models.baselines import blend, moving_avg, seasonal_index, seasonal_naive
@@ -42,7 +42,10 @@ def training_origins(start, valid_origin, cfg: dict) -> list[pd.Timestamp]:
     cands = pd.date_range(pd.Timestamp(start), valid_origin, freq=b["step_weeks"] * WEEK)
     keep = [t for t in cands if t + h_max * WEEK <= valid_origin]
     ratio = max(1, b["step_weeks_before_switch"] // b["step_weeks"])
-    switch = pd.Timestamp(cfg["features"]["switch_date"])
+    sd = cfg["smoothing"].get("switch_date")
+    if sd is None or ratio == 1:
+        return keep
+    switch = pd.Timestamp(sd)
     return [t for i, t in enumerate(keep) if t >= switch or i % ratio == 0]
 
 
@@ -66,7 +69,8 @@ def baseline_forecasts(weekly: pd.DataFrame, T: pd.Timestamp, cfg: dict) -> dict
     ma = moving_avg(train, h, 13)
     sn = seasonal_naive(train, h, b["season_length"], b["fallback_window"])
     out = {"moving_avg_13": ma, "seasonal_naive": sn,
-           "seasonal_index": seasonal_index(train, h, 13, b["season_length"], tuple(cfg["backtest"]["seasonal_index_clip"]))}
+           "seasonal_index": seasonal_index(train, h, 13, b["season_length"], tuple(cfg["backtest"]["seasonal_index_clip"]),
+                                            cfg["dataset"].get("group_level"))}
     for w in cfg["backtest"]["blend_weights"]:
         out[f"blend_{w:g}"] = blend(sn, ma, w)  # w x seasonal naive + (1 - w) x MA13
     return out
@@ -90,12 +94,12 @@ def lgbm_forecasts(cache, train_origins, T, cfg, scale: str, ids_options, weekly
     train = train.drop(columns=["unique_id", "product", "origin"])  # strings / unused: save memory
     assert train["target_date"].max() <= T, "a training target falls inside the validation window"
     train = apply_scaling(train, cfg, scale, keep_raw=False)
-    cats = set_categories(train)
+    cats = set_categories(train, cfg)
     valid = apply_scaling(load_origins(cache, [T]), cfg, scale, keep_raw=False)
-    set_categories(valid, cats)
+    set_categories(valid, cfg, cats)
     out = {}
     for use_ids in ids_options:
-        feats = lgbm.select_features(feats_all, use_ids)
+        feats = lgbm.select_features(feats_all, use_ids, id_features(cfg))
         t0 = time.time()
         model = lgbm.fit(train, feats, cfg["lgbm"]["params"], weight_by_scale=cfg["lgbm"]["weight_by_scale"])
         out[use_ids] = {"forecast": lgbm.predict(model, valid, feats), "importance": lgbm.importance(model, feats),

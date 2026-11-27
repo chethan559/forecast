@@ -1,0 +1,139 @@
+# VN1 forecasting competition. Every VN1-specific value and every decision taken on VN1 lives here.
+# Evidence for each decision: experiments.md and reports/final_config.md.
+
+dataset:
+  name: vn1
+  adapter: vn1
+  hierarchy: [client, warehouse]
+  item_column: product      # the same product across warehouses
+  group_level: client       # client totals drive the group trend / share / uplift features
+  calendar: us
+
+paths:
+  raw_dir: data/raw/vn1
+  processed_dir: data/processed
+  reports_dir: reports
+  outputs_dir: outputs
+  artifacts_dir: artifacts/vn1
+  files:
+    phase0_sales: "Phase 0 - Sales.csv"
+    phase0_price: "Phase 0 - Price.csv"
+    phase1_sales: "Phase 1 - Sales.csv"
+    phase1_price: "Phase 1 - Price.csv"
+    phase2_sales: "Phase 2 - Sales.csv"   # held-out test: actuals export + shape check only
+
+# Leakage guard: cleaning refuses any data after the last Phase 1 week (Phase 2 starts 2024-01-08).
+max_allowed_date: "2024-01-01"
+freq: W-MON
+
+smoothing:
+  enabled: true
+  min_run_length: 3
+  # Found automatically by the changepoint on the weekly repeat rate (20.0% before, 10.1% after),
+  # then pinned so features use one fixed date at every origin.
+  switch_date: "2022-08-29"
+  switch_min_segment_weeks: 13
+
+price_shift:
+  window: 8
+  ratio_threshold: 2.5
+  min_periods: 4            # decision 2026-11-25: >= 4 observed prices per window (367 series vs 767 with 1)
+
+price_rules:
+  # decision 2026-11-25: client 0 prices before the weekly switch flip ~3x up and down (aggregation artefact).
+  ignore:
+    - {column: client, value: 0, before: "2022-08-29"}
+
+relative_price:
+  window: 13
+  min_periods: 1
+
+stockout:
+  use_in_stock_column: true
+  min_zero_run: 4
+  max_zero_run: 13          # decision 2026-11-25: longer zero runs look like off-season / dormancy
+  pre_window: 13
+  min_pre_mean: 2.0
+  min_pre_periods: 4
+  include_trailing_run: false
+
+level_shift:
+  short_window: 4
+  long_window: 13
+  ratio: 10.0
+  min_level: 5.0
+  cooldown_weeks: 13
+  group_keys: [warehouse, client]
+  group_share: 0.5
+  min_group_series: 5
+  restart_after_shift: true # decision 2026-11-25 (round 3): 0.5089 vs 0.5158 off
+
+classification:
+  adi_threshold: 1.32
+  cv2_threshold: 0.49
+  new_series_weeks: 52
+  inactive_weeks: 13
+  from_date: null
+
+baselines:
+  h: 13
+  moving_avg_windows: [4, 8, 13, 26]
+  season_length: 52
+  fallback_window: 13
+  inactive_weeks: 13
+  volume_bands: [0.01, 0.10]
+  output_dir: outputs/baselines
+
+features:
+  horizons: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+  lags: [1, 2, 4, 8, 13]
+  roll_windows: [4, 8, 13, 26, 52]
+  max_window: 13
+  season_length: 52
+  scale_window: 13
+  scale_method: max13_52    # decision: max(mean13, mean52) so quiet series keep a realistic scale
+  optional_features: [uplift]   # decision: best 4-fold average (0.516 vs 0.522), biggest gain on the holiday fold
+  scale_floor: 0.1
+  demand_type_window: 52
+
+splits:
+  origin_start: "2022-09-05"
+  origin_step_weeks: 2
+  inner_valid_origin: "2023-07-03"
+  phase1_forecast_origin: "2023-10-02"
+
+lgbm:
+  params: {objective: tweedie, verbosity: -1, seed: 0, deterministic: true, force_col_wise: true}
+  weight_by_scale: true
+  use_ids: false            # decision: with ids, warehouse 251's jump was memorised (fold B 2.34 / 3.22)
+  origins_setting: full
+  forecast_cap_k: 3.0       # safety net: fixes the blow-ups, neutral otherwise
+  bias_multiplier: 1.0      # not adopted (leave-one-fold-out 0.5098 vs 0.5089)
+
+lgbm_smoke: {objective: tweedie, verbosity: -1, seed: 0}
+
+intervals:
+  method: conformal         # set by the interval experiment (reports/intervals.md)
+  lower: 0.1
+  upper: 0.9
+
+final:
+  method: lgbm
+  baseline: blend_0.25
+  routing_blend_w: 0.5
+  routing_segments: {volume_band: ["top 1%"], demand_type: [lumpy]}
+  selection_folds: [B, C, D, E]
+  min_fold_wins: 3
+
+backtest:
+  folds: {A: "2022-10-31", B: "2023-01-30", C: "2023-04-03", D: "2023-07-03"}
+  holiday_folds: [A]
+  origin_settings:
+    full: {start: "2021-07-05"}
+    weekly_only: {start: "2022-09-05"}
+  step_weeks: 2
+  step_weeks_before_switch: 2
+  lgbm_grid: {scale: [mean13, max13_52], ids: [true, false], origins: [full, weekly_only]}
+  blend_weights: [0.25, 0.5, 0.75]
+  seasonal_index_clip: [0.25, 4.0]
+  output_dir: outputs/backtest

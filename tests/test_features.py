@@ -10,7 +10,7 @@ import pytest
 from src.adapters.vn1 import load_phase
 from src.cleaning import run_cleaning
 from src.config import get_config
-from src.features import (BASE_COLUMNS, TARGET_COLUMNS, make_features, model_features, scaled_features,
+from src.features import (TARGET_COLUMNS, make_features, model_features, scaled_features,
                           us_holiday_weeks)
 from src.run_cleaning import build_outputs
 from src.splits import inner_validation_split, phase1_split

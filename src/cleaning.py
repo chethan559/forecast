@@ -92,7 +92,7 @@ def estimate_weekly_switch_date(df: pd.DataFrame, min_segment: int = 13) -> dict
     }
 
 
-def flag_smoothed_weeks(df: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, dict]:
+def flag_smoothed_weeks(df: pd.DataFrame, cfg: dict, also_estimate: bool = False) -> tuple[pd.DataFrame, dict]:
     """Flag runs of >= min_run_length identical consecutive positive values, and the smoothed era.
 
     Columns added (values are NOT changed):
@@ -110,11 +110,20 @@ def flag_smoothed_weeks(df: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, dict
     df["identical_run_len"] = run_len.astype("int32")
     df["identical_run"] = df["y"].gt(0) & run_len.ge(c["min_run_length"])
 
-    if c.get("switch_date"):
-        info = {"switch_date": pd.Timestamp(c["switch_date"]), "method": "forced in config"}
+    # smoothing.enabled = false: no smoothed era (runs are still recorded in identical_run).
+    # smoothing.switch_date pinned: use it (also_estimate=True still runs the detector, for the report).
+    # Otherwise: estimate the switch from this data (changepoint on the weekly repeat rate).
+    if not c.get("enabled", True):
+        info = {"switch_date": None, "method": "disabled in config"}
+    elif c.get("switch_date") and not also_estimate:
+        info = {"switch_date": pd.Timestamp(c["switch_date"]), "method": "pinned in config"}
     else:
         info = estimate_weekly_switch_date(df, c["switch_min_segment_weeks"])
+        info["estimated_switch_date"] = info["switch_date"]
         info["method"] = "changepoint on weekly repeat rate"
+        if c.get("switch_date"):
+            info["switch_date"] = pd.Timestamp(c["switch_date"])
+            info["method"] = "pinned in config (changepoint estimate reported alongside)"
     sd = info["switch_date"]
     df["is_smoothed_era"] = df["ds"] < sd if sd is not None else False
     df["is_smoothed"] = df["identical_run"] & df["is_smoothed_era"]
@@ -256,6 +265,11 @@ def flag_suspected_stockouts(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     c = cfg["stockout"]
     df = _sorted(df)
     is_zero = df["y"].eq(0)
+    if "in_stock" in df.columns and c.get("use_in_stock_column", True):
+        # Known stock status (e.g. Shopify inventory): no guessing needed.
+        df["zero_run_len"] = df.groupby(_run_ids(df, is_zero))["y"].transform("size").where(is_zero, 0).astype("int32")
+        df["is_suspected_stockout"] = ~df["in_stock"].astype(bool)
+        return df
     run = _run_ids(df, is_zero)
     run_len = df.groupby(run)["y"].transform("size")
     df["zero_run_len"] = run_len.where(is_zero, 0).astype("int32")
@@ -316,8 +330,8 @@ def classify_series(df: pd.DataFrame, cfg: dict, switch_date=None) -> pd.DataFra
     c = cfg["classification"]
     end = _last_date(df)
     g = df.groupby("unique_id")
-    t = g.agg(client=("client", "first"), warehouse=("warehouse", "first"), product=("product", "first"),
-              history_weeks=("ds", "size"), total_units=("y", "sum"))
+    meta = [c for c in _meta_columns(cfg) if c in df.columns]
+    t = g.agg(**{c: (c, "first") for c in meta}, history_weeks=("ds", "size"), total_units=("y", "sum"))
     last_sale = df.loc[df["y"].gt(0)].groupby("unique_id")["ds"].max()
     t["last_sale_date"] = last_sale.reindex(t.index)
 
@@ -339,8 +353,18 @@ def classify_series(df: pd.DataFrame, cfg: dict, switch_date=None) -> pd.DataFra
 
 
 # ----------------------------------------------------------------------------- pipeline
+def _weekly_columns(df: pd.DataFrame, cfg: dict) -> list[str]:
+    cols = ["unique_id"] + [c for c in _meta_columns(cfg) if c in df.columns] + WEEKLY_COLUMNS[1:]
+    return cols + (["in_stock"] if "in_stock" in df.columns else [])
+
+
+def _meta_columns(cfg: dict) -> list[str]:
+    d = cfg["dataset"]
+    return list(dict.fromkeys(list(d["hierarchy"]) + ([d["item_column"]] if d.get("item_column") else [])))
+
+
 WEEKLY_COLUMNS = [
-    "unique_id", "client", "warehouse", "product", "ds", "y",
+    "unique_id", "ds", "y",
     "identical_run_len", "identical_run", "is_smoothed_era", "is_smoothed",
     "price_raw", "price_observed", "price_zero", "price_clean", "price_filled",
     "price_shift", "price_shift_detected", "price_regime", "price_baseline", "relative_price",
@@ -367,7 +391,7 @@ def run_cleaning(sales_df: pd.DataFrame, price_df: pd.DataFrame | None, config: 
     price_check = check_price_missing_pattern(df)
 
     df, first_sale = trim_leading_zeros(df)                       # a
-    df, switch = flag_smoothed_weeks(df, config)                   # b
+    df, switch = flag_smoothed_weeks(df, config, also_estimate=True)  # b
     df = clean_price(df)                                           # c
     df, shifts = flag_price_level_shift(df, config)                # d
     df = add_relative_price(df, config)                            # e
@@ -404,12 +428,12 @@ def run_cleaning(sales_df: pd.DataFrame, price_df: pd.DataFrame | None, config: 
     series = series.reset_index()
 
     if not return_diagnostics:
-        return df[WEEKLY_COLUMNS], series
+        return df[_weekly_columns(df, config)], series
     rate = switch.pop("rate", None)
     diag = {"switch": switch, "price_check": price_check, "price_shift_events": shifts,
             "level_shift_events": level_events,
             "repeat_rate": rate, "data_end": _last_date(df)}
-    return df[WEEKLY_COLUMNS], series, diag
+    return df[_weekly_columns(df, config)], series, diag
 
 
 # ----------------------------------------------------------------------------- (h) level shifts

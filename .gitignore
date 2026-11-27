@@ -12,3 +12,6 @@ data/processed/
 outputs/**/*.parquet
 outputs/**/*.log
 outputs/**/forecasts/
+
+# Trained model artifacts (rebuild with --stage fit)
+artifacts/

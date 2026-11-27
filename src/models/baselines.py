@@ -127,7 +127,7 @@ def blend(fc_a: pd.DataFrame, fc_b: pd.DataFrame, w: float) -> pd.DataFrame:
 
 
 def seasonal_index(train_df: pd.DataFrame, h: int = 13, window: int = 13, season_length: int = 52,
-                   clip: tuple[float, float] = (0.25, 4.0)) -> pd.DataFrame:
+                   clip: tuple[float, float] = (0.25, 4.0), group_col: str | None = "client") -> pd.DataFrame:
     """moving_avg(window) x a client-level seasonal ratio taken from last year.
 
     For target week W and client c:
@@ -136,8 +136,13 @@ def seasonal_index(train_df: pd.DataFrame, h: int = 13, window: int = 13, season
     i.e. "how did last year's same week compare with last year's level at the same point".
     The moving average gives this year's level; the ratio gives the shape. Client totals pool many
     series, so the shape is much less noisy than a single series' seasonal naive.
-    Needs a `client` column. Ratio = 1 where last year is missing or zero; clipped to `clip`.
+    `group_col` = the grouping column (VN1: client); None = all series form one group.
+    Ratio = 1 where last year is missing or zero; clipped to `clip`.
     """
+    if group_col is None or group_col not in train_df.columns:
+        train_df = train_df.assign(_group=0)
+        group_col = "_group"
+    train_df = train_df.rename(columns={group_col: "client"}) if group_col != "client" else train_df
     end = train_df["ds"].max()
     out = moving_avg(train_df, h, window).merge(
         train_df.groupby("unique_id")["client"].first().rename("client").reset_index(), on="unique_id", how="left")
