@@ -297,3 +297,59 @@ Folds B, C, D + E (Phase 1). Engine p50 reproduced every frozen fold score exact
   horizon-level residuals dominated by small series. Quantile LightGBM is narrower and steadier but
   over-covers, mostly at the bottom (2.7% below p10). Candidate next steps: lower the conformal group minimum,
   calibrate on the same season last year, or a conformal correction on top of the quantile models.
+
+## 2026-11-27 — Generalisation test on M5 (VN1 defaults, no tuning)
+
+Official Kaggle M5 files copied to `data/raw/m5/` (originals untouched). `python -m src.experiment_m5 --stage
+prepare|backtest|freeze|test`, then `python -m src.report_generalisation`. Reports: `reports/m5/data_quality.md`,
+`reports/m5/backtest.md`, `reports/m5_config.md`, `reports/m5/test.md`, `reports/generalisation.md`.
+
+- **Data:** 30,490 item × store series, 264 training weeks (2011-01-31 → 2016-02-15), 63.0M units.
+  - Demand types: 51.6% smooth, 6.0% erratic, 34.1% intermittent, 8.3% lumpy.
+  - Zero weeks after first sale: 24.4%.
+- **Sealed:** the last 13 complete Monday weeks (2016-02-22 → 2016-05-16), split off right after the adapter
+  (`src/sealed.py`).
+  - Cleaning and `engine.prepare` refuse dates after `max_allowed_date` 2016-02-15.
+  - `read_sealed` refuses before the freeze.
+  - A test spies on every parquet read during the backtest stage and checks the sealed file is never opened.
+- **Data-quality findings (VN1 thresholds):**
+  - Smoothed-era detector: 2014-03-17, but the repeat rate *rises* (10.9% → 12.0%), so it's spurious. Pinned
+    anyway, following the VN1 procedure; 1.9% of series-weeks flagged.
+  - Level-shift rule: 29,796 series events in 43% of series, 71% downward (stockouts and delistings, not
+    structural breaks); 0 group events.
+  - Suspected stockout weeks: 3.2%. Series with a price level shift: 86.
+- **Sample (decided before any result):** 7,000 series, seed 0. All 30,490 series under the VN1
+  training-origin rule would need ~33M training rows, which doesn't fit in 8 GB. The sample trains on
+  5.3–7.0M rows per fold; peak memory 2.7 GB.
+- **Automatic rolling folds** (`src/folds.py`): 13-week steps back from the seal, giving F1 2015-02-16,
+  F2 2015-05-18, F3 2015-08-17 and F4 2015-11-16. F4 is the holiday fold, kept because its previous year is
+  after the switch.
+- **Frozen:** `outputs/m5/test/frozen_config.json`. The only setting differences from VN1 are data
+  descriptions: switch date, group keys = hierarchy, no price rule, training-start rule null (= data start +
+  52 weeks, as VN1). Best baseline from the backtest: blend_0.25.
+
+| | engine | moving_avg_13 | seasonal_naive | blend_0.25 | engine WAPE | engine bias | engine 80% coverage |
+|---|---|---|---|---|---|---|---|
+| F1 | **0.5112** | 0.5726 | 0.7212 | 0.5468 | 0.487 | −2.4% | |
+| F2 | 0.5712 | 0.5722 | 0.6939 | **0.5568** | 0.475 | −9.7% | |
+| F3 | 0.4886 | **0.4882** | 0.7053 | 0.4969 | 0.447 | −4.2% | |
+| F4 (holiday) | 0.5209 | 0.5274 | 0.7177 | **0.4857** | 0.452 | −6.9% | |
+| backtest mean | 0.5230 | 0.5401 | 0.7095 | **0.5216** | 0.465 | −5.8% | 80.9% |
+| **sealed test (once)** | **0.4516** | | | 0.5535 | 0.407 | −4.4% | 77.8% |
+
+- **Headline:** the engine had the lowest WAPE in every fold and was best in every volume band.
+- **Lost F2 and F4 on bias only:** it under-forecasts a business growing 6–8% a year (VN1 needed no bias
+  correction).
+- **Test:** 18% better than blend_0.25, better in every band (top 1% 0.298 vs 0.405).
+- **VN1 side by side:**
+  - Backtest: engine 0.471 vs blend 0.580.
+  - Phase 1: 0.571 vs 0.582.
+  - Phase 2: 0.488 vs 0.784.
+- **Did not transfer:**
+  - The smoothed-era detector needs a direction and size test.
+  - The level-shift rule is noise on retail stockouts.
+  - No growth / bias handling.
+  - The New Year rebound after Christmas.
+  - Full-catalogue training memory.
+- **Did transfer:** model and features with no retuning, the cap, conformal coverage (same top-1%
+  over-coverage), and the holiday-fold rule.

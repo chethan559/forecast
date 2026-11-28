@@ -18,6 +18,7 @@ paths:
   artifacts_dir: artifacts/unnamed
 
 max_allowed_date: null     # leakage guard: cleaning refuses data after this date (null = no guard)
+seal: null                 # {weeks: N, first_week, last_week}: last N weeks held out as a test set (src/sealed.py)
 freq: W-MON
 
 smoothing:                 # "monthly totals spread over weeks" detection
@@ -104,6 +105,7 @@ final:
 
 backtest:
   folds: {}                # {name: origin date}; each fold forecasts the 13 weeks after its origin
+  auto_folds: {n: 4, step_weeks: 13}   # used when folds is empty (src/folds.py)
   holiday_folds: []
   origin_settings:
     full: {start: null}    # null = first week of data + one season (52 weeks)

@@ -28,7 +28,7 @@ Configs: `configs/defaults.yaml` (generic defaults) is merged with a dataset fil
 | config | adapter | data (not in the repo) | status |
 |---|---|---|---|
 | `configs/vn1.yaml` | `vn1` (wide CSVs) | `data/raw/vn1/` | full pipeline, frozen and scored |
-| `configs/m5.yaml` | `m5` (daily → Monday weeks) | Kaggle M5 files in `data/raw/m5/` | loads and validates; no modelling yet |
+| `configs/m5.yaml` | `m5` (daily → Monday weeks) | Kaggle M5 files in `data/raw/m5/` | generalisation test done (`reports/generalisation.md`) |
 | `configs/shopify_example.yaml` | `shopify_orders` (orders export → weekly units per SKU, refunds/cancellations excluded) | `data/raw/shopify_example/orders_export.csv` | example; set your folds |
 
 A new dataset needs: an adapter (or `long_csv` with a column mapping) that produces the standard schema
@@ -112,6 +112,19 @@ Takes roughly 20–30 minutes and up to ~5 GB of RAM.
 Both one-off runs check a frozen snapshot of the config and source (`outputs/phase*/frozen_config.json`)
 and refuse to run twice.
 
+## Generalisation test on M5
+
+```bash
+.venv/bin/python -m src.experiment_m5 --stage prepare    # seal last 13 weeks, clean, sample (~30 s)
+.venv/bin/python -m src.experiment_m5 --stage backtest   # 4 automatic folds, engine vs baselines (~7 min)
+.venv/bin/python -m src.experiment_m5 --stage freeze     # snapshot config + source -> reports/m5_config.md
+.venv/bin/python -m src.experiment_m5 --stage test       # ONCE: score the sealed weeks (~2 min)
+.venv/bin/python -m src.report_generalisation            # VN1 vs M5 tables
+```
+
+Result: sealed M5 test 0.452 vs 0.554 for blend_0.25, with the VN1 config untouched. Details and what didn't
+transfer: `reports/generalisation.md`.
+
 ## Tests
 
 ```bash
@@ -146,6 +159,7 @@ that the refactored engine still reproduces those scores.
 | `src/calendar.py` | US and AU holiday calendars (Monday weeks) |
 | `src/adapters/m5.py`, `shopify_orders.py`, `long_csv.py` | other data sources → standard schema |
 | `configs/*.yaml` | per-dataset config (all thresholds, dates, rules); `defaults.yaml` for the rest |
+| `src/experiment_m5.py`, `src/folds.py`, `src/sealed.py` | M5 generalisation test, automatic rolling folds, sealed test weeks |
 | `src/experiment_intervals.py` | interval method comparison on VN1 (`reports/intervals.md`) |
 | `src/report.py` | data quality report and charts |
 | `src/run_cleaning.py` | one-command entry point |

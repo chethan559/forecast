@@ -19,7 +19,8 @@ def test_vn1_yaml_holds_the_vn1_decisions():
 def test_defaults_and_overrides():
     c = load_config(ROOT / "configs" / "m5.yaml", {"features": {"scale_floor": 0.5}})
     assert c["features"]["scale_floor"] == 0.5 and c["features"]["scale_method"] == "max13_52"  # from defaults
-    assert c["smoothing"]["enabled"] is False and c["level_shift"]["group_keys"] == ["store_id"]
+    assert c["smoothing"]["enabled"] is True and c["smoothing"]["switch_date"] == "2014-03-17"
+    assert c["level_shift"]["group_keys"] == c["dataset"]["hierarchy"]  # generic default
 
 
 def test_group_keys_default_to_hierarchy():

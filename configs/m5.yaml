@@ -1,7 +1,8 @@
 # M5 (Walmart) daily sales, aggregated to Monday weeks by src/adapters/m5.py.
 # Data (not in the repo): Kaggle "M5 Forecasting - Accuracy" -> data/raw/m5/
 #   sales_train_evaluation.csv, calendar.csv, sell_prices.csv
-# Status: loads and validates only. No modelling has been run on M5 yet.
+# Generalisation test (src/experiment_m5.py): every model, feature and threshold setting is the VN1 default.
+# Only what the data force differs: hierarchy, item column, paths, the sealed weeks and the series sample.
 
 dataset:
   name: m5
@@ -10,10 +11,10 @@ dataset:
     sales_file: sales_train_evaluation.csv
     calendar_file: calendar.csv
     prices_file: sell_prices.csv
-    max_series: null          # e.g. 2000 for a quick look
+    max_series: null
   hierarchy: [state_id, store_id, cat_id, dept_id]
   item_column: item_id         # same item across stores
-  group_level: store_id
+  group_level: store_id        # set before any M5 modelling (the store is the selling unit, like a VN1 client)
   calendar: us
 
 paths:
@@ -23,11 +24,21 @@ paths:
   outputs_dir: outputs/m5
   artifacts_dir: artifacts/m5
 
-smoothing:
-  enabled: false              # M5 is true daily data aggregated by us: no smoothed era
+# Sealed test: the last 13 complete Monday weeks (2016-02-22 .. 2016-05-16). Dates only, from the data shape.
+max_allowed_date: "2016-02-15"
+seal: {weeks: 13, first_week: "2016-02-22", last_week: "2016-05-16"}
 
-level_shift:
-  group_keys: [store_id]
+experiment:
+  # 30,490 series x the VN1 training-origin rule = ~33M training rows, which does not fit in 8 GB.
+  # A fixed random sample keeps the training set at VN1's size (~7.7M rows). Chosen before any result.
+  sample_series: 7000
+  sample_seed: 0
+
+smoothing:
+  enabled: true                # VN1 default: detect automatically
+  # Found by the changepoint on the weekly repeat rate in the prepare step, then pinned (same procedure as VN1).
+  # Not a real smoothed era: the repeat rate goes UP after it (10.9% -> 12.0%; VN1: 20.0% -> 10.1%).
+  switch_date: "2014-03-17"
 
 backtest:
-  folds: {}                   # set when M5 modelling starts
+  folds: {}                    # automatic rolling folds (backtest.auto_folds, src/folds.py)

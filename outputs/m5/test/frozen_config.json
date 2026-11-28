@@ -1,0 +1,244 @@
+{
+ "config": {
+  "dataset": {
+   "name": "m5",
+   "adapter": "m5",
+   "adapter_args": {
+    "sales_file": "sales_train_evaluation.csv",
+    "calendar_file": "calendar.csv",
+    "prices_file": "sell_prices.csv",
+    "max_series": null
+   },
+   "hierarchy": [
+    "state_id",
+    "store_id",
+    "cat_id",
+    "dept_id"
+   ],
+   "item_column": "item_id",
+   "group_level": "store_id",
+   "calendar": "us"
+  },
+  "paths": {
+   "raw_dir": "/Users/chethankumar/inventory/zova-forecast/data/raw/m5",
+   "processed_dir": "/Users/chethankumar/inventory/zova-forecast/data/processed/m5",
+   "reports_dir": "/Users/chethankumar/inventory/zova-forecast/reports/m5",
+   "outputs_dir": "/Users/chethankumar/inventory/zova-forecast/outputs/m5",
+   "artifacts_dir": "/Users/chethankumar/inventory/zova-forecast/artifacts/m5"
+  },
+  "max_allowed_date": "2016-02-15",
+  "seal": {
+   "weeks": 13,
+   "first_week": "2016-02-22",
+   "last_week": "2016-05-16"
+  },
+  "freq": "W-MON",
+  "smoothing": {
+   "enabled": true,
+   "min_run_length": 3,
+   "switch_date": "2014-03-17",
+   "switch_min_segment_weeks": 13
+  },
+  "price_shift": {
+   "window": 8,
+   "ratio_threshold": 2.5,
+   "min_periods": 4
+  },
+  "price_rules": {
+   "ignore": []
+  },
+  "relative_price": {
+   "window": 13,
+   "min_periods": 1
+  },
+  "stockout": {
+   "use_in_stock_column": true,
+   "min_zero_run": 4,
+   "max_zero_run": 13,
+   "pre_window": 13,
+   "min_pre_mean": 2.0,
+   "min_pre_periods": 4,
+   "include_trailing_run": false
+  },
+  "level_shift": {
+   "short_window": 4,
+   "long_window": 13,
+   "ratio": 10.0,
+   "min_level": 5.0,
+   "cooldown_weeks": 13,
+   "group_keys": [
+    "state_id",
+    "store_id",
+    "cat_id",
+    "dept_id"
+   ],
+   "group_share": 0.5,
+   "min_group_series": 5,
+   "restart_after_shift": true
+  },
+  "classification": {
+   "adi_threshold": 1.32,
+   "cv2_threshold": 0.49,
+   "new_series_weeks": 52,
+   "inactive_weeks": 13,
+   "from_date": null
+  },
+  "baselines": {
+   "h": 13,
+   "moving_avg_windows": [
+    4,
+    8,
+    13,
+    26
+   ],
+   "season_length": 52,
+   "fallback_window": 13,
+   "inactive_weeks": 13,
+   "volume_bands": [
+    0.01,
+    0.1
+   ],
+   "output_dir": "/Users/chethankumar/inventory/zova-forecast/outputs/m5/baselines"
+  },
+  "features": {
+   "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+   ],
+   "lags": [
+    1,
+    2,
+    4,
+    8,
+    13
+   ],
+   "roll_windows": [
+    4,
+    8,
+    13,
+    26,
+    52
+   ],
+   "max_window": 13,
+   "season_length": 52,
+   "scale_window": 13,
+   "scale_method": "max13_52",
+   "optional_features": [
+    "uplift"
+   ],
+   "scale_floor": 0.1,
+   "demand_type_window": 52
+  },
+  "lgbm": {
+   "params": {
+    "objective": "tweedie",
+    "verbosity": -1,
+    "seed": 0,
+    "deterministic": true,
+    "force_col_wise": true
+   },
+   "weight_by_scale": true,
+   "use_ids": false,
+   "origins_setting": "full",
+   "forecast_cap_k": 3.0,
+   "bias_multiplier": 1.0
+  },
+  "intervals": {
+   "method": "conformal",
+   "lower": 0.1,
+   "upper": 0.9
+  },
+  "final": {
+   "method": "lgbm",
+   "baseline": "blend_0.25"
+  },
+  "backtest": {
+   "folds": {},
+   "auto_folds": {
+    "n": 4,
+    "step_weeks": 13
+   },
+   "holiday_folds": [],
+   "origin_settings": {
+    "full": {
+     "start": null
+    }
+   },
+   "step_weeks": 2,
+   "step_weeks_before_switch": 2,
+   "blend_weights": [
+    0.25,
+    0.5,
+    0.75
+   ],
+   "seasonal_index_clip": [
+    0.25,
+    4.0
+   ],
+   "output_dir": "/Users/chethankumar/inventory/zova-forecast/outputs/m5/backtest"
+  },
+  "experiment": {
+   "sample_series": 7000,
+   "sample_seed": 0
+  },
+  "config_path": "/Users/chethankumar/inventory/zova-forecast/configs/m5.yaml"
+ },
+ "source_sha256": {
+  "src/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "src/adapters/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "src/adapters/long_csv.py": "f8a7fc22be53c2445f522fc9d6aae13b98b3ee0796ab68dbc5595f81a93089f6",
+  "src/adapters/m5.py": "43532daad55eb792fb1bf8ab6c209afde29261c4197a4809e7dac4e7960e6594",
+  "src/adapters/shopify_orders.py": "e569ae54b68bdaf077ffb69202108a04502a8ce15218d1ece241f79b98e625fc",
+  "src/adapters/vn1.py": "d96d7469e8c99f49a01f640b051958a589dda7fc0ffeabc71e2c1f9d13eacd35",
+  "src/backtest.py": "6822170e7f64dc9e52409a534810edcbe09d4fdf87b987dd368d40e0cb8a1684",
+  "src/calendar.py": "9f48ecec0d7b07c4a568cf95f555bea9bf9774c76e8fc0a94b5be1864b90cac0",
+  "src/cleaning.py": "e4469bd6973eaddce522b77bb9162896c16d5da74a4493a19178bf5a6cb24853",
+  "src/config.py": "d8badde7b921e7b8c2acdb076005576514e0a0e285848b8b3d8d18e17fd621b2",
+  "src/engine.py": "2183d7f83d109a48fb04ad53d05115139efce93cdeb95a469e30bad7715be6da",
+  "src/evaluation.py": "383a8fd73bf836b3c31c3257e0aafef7baeb74ad4eafbec69f8440a0f289acfb",
+  "src/experiment_final.py": "34eff067db33124bcd4f6ea30294b1b76f19e24e1ba74ffc0183942d86c141d3",
+  "src/experiment_intervals.py": "22a2ebf553dd7d41e5e81bb8309d11f582f31c34ee878ad23fd907966dc098b5",
+  "src/experiment_m5.py": "cbb636b81eccf6913459f4f47d047d6afab507b75280f3bf774a694f947814f1",
+  "src/experiment_round2.py": "7dab6c18dfcc2d25c9c972947bfbc93f5b3c14d265200d914004fc71ce8b8a02",
+  "src/experiment_round3.py": "c9c16ced50a83b9c9da847530ec3fd16c8f3c69d07ca321baaaafc91961f0a3e",
+  "src/feature_cache.py": "8ebdb8cdba5d607e59f9956935f138adb90c6f65a8ca2e6c87c7ad8e061dc2bb",
+  "src/features.py": "667b5994178118b3c9cd87adc9743a82333dd9df2345c5818b3da633a7d52e25",
+  "src/final_model.py": "997eb08975eb0a143c65df2e0e50f0b13d4679c44fb1c2b7a0e59f754bec572e",
+  "src/folds.py": "fb3851a9476cb06e6a5052fd020f5f69043a7b16c9f84ab1c1d2cd5db5c9e918",
+  "src/freeze.py": "c51e51c9faba25b1b03b6b5e987869c531ca39402c7322ffe609cd235095d995",
+  "src/metrics.py": "ff23c96c8d0a05c96cef79eeb5f2cf92515ebc068a69427abab310210a3ba612",
+  "src/models/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "src/models/baselines.py": "51efeda825c64d9774e568caa0fb4175c3f415b681ec7f29163f3276c43d5951",
+  "src/models/lgbm.py": "6f91e4da97f0153566f65c8fa17601d9aba8a13519e576b5b06a2b1d9955cc34",
+  "src/models/postprocess.py": "993c38949dd06e366ebf976cb64d0ef33ced0b84d1725fa46f28539835756da8",
+  "src/report.py": "4442b19e070bea986bb3a64afcbedff8e0767469ab4c4476c31d0a3e8dd9961e",
+  "src/report_generalisation.py": "af40ee7d1403d44d7fbe61655b55539450ee5eeb750ceed9ba0a561b9562c48a",
+  "src/run.py": "63fd90f07ba5762ca99da0b7abb5953e57e33bd5c4c6c0fc06761ff42947a9e4",
+  "src/run_baselines.py": "a0c7e6fdadac49b1930103d46e56c03cc4de5164b02d3b0b61a39ec8b887c51f",
+  "src/run_cleaning.py": "9e598d4e3fd3a99c621f49e408704cf7c1399c32e28ec63d7232364599c63762",
+  "src/run_features.py": "b42a033241db37258a9a45345405b68bd0f0e18c96337d58a19b538def503c58",
+  "src/run_phase1.py": "3b3157a728ca8fd94be895ecbac374d0487d00fc876aa3b17842737d653324da",
+  "src/run_phase2.py": "884fffbddb5fcd78af1eee1865f48f655843b103df0c329606310e634d39397d",
+  "src/schema.py": "843930d94288bd0053f14b2ff2bae2dbb07b91500d6111813f0a92cd1633bbd6",
+  "src/sealed.py": "62444301a89e805dbb6de76149e28f13ada9fdca851cad5571a0fca2858cf5af",
+  "src/splits.py": "6bf7184d7cb13cf6c5a123aaf1bfcfefb03ca814adc835453c516150d193806a"
+ },
+ "best_baseline": "blend_0.25",
+ "backtest_mean_score": {
+  "blend_0.25": 0.5215626795195083,
+  "engine": 0.5230027362713099,
+  "moving_avg_13": 0.5400823227030612,
+  "seasonal_naive": 0.709509427048594
+ }
+}

@@ -1,0 +1,6 @@
+{
+  "train_rows": 7683728,
+  "n_train_origins": 100,
+  "seconds": 112,
+  "best_baseline": "blend_0.25"
+}

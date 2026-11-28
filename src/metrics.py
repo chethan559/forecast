@@ -66,3 +66,11 @@ def vn1_score_by_group(forecast_df: pd.DataFrame, actual_df: pd.DataFrame, group
     out["unit_share"] = out["actual_units"] / out["actual_units"].sum()
     out["abs_error_share"] = out["abs_error"] / out["abs_error"].sum()
     return out
+
+
+def point_metrics(forecast_df: pd.DataFrame, actual_df: pd.DataFrame, forecast_col: str = "forecast") -> dict:
+    """VN1 score plus WAPE (= the accuracy part, sum|F - A| / sum A) and signed bias (sum(F - A) / sum A)."""
+    s = vn1_score(forecast_df, actual_df, forecast_col=forecast_col)
+    e = actual_df[KEY + ["y"]].merge(forecast_df[KEY + [forecast_col]], on=KEY)
+    return {"score": s["score"], "wape": s["accuracy"], "bias": float((e[forecast_col] - e["y"]).sum() / e["y"].sum()),
+            "n": s["n"]}

@@ -1,0 +1,58 @@
+{
+  "folds": {
+    "F1": {
+      "origin": "2015-02-16",
+      "train_rows": 5345652,
+      "n_train_origins": 74,
+      "seconds": 149
+    },
+    "F2": {
+      "origin": "2015-05-18",
+      "train_rows": 5877300,
+      "n_train_origins": 80,
+      "seconds": 85
+    },
+    "F3": {
+      "origin": "2015-08-17",
+      "train_rows": 6504914,
+      "n_train_origins": 87,
+      "seconds": 93
+    },
+    "F4": {
+      "origin": "2015-11-16",
+      "train_rows": 7048340,
+      "n_train_origins": 93,
+      "seconds": 102
+    }
+  },
+  "log": [
+    {
+      "origin": "2015-11-16",
+      "window": "2015-11-23 .. 2016-02-15",
+      "holiday": true,
+      "previous_year_clean": true,
+      "kept": true
+    },
+    {
+      "origin": "2015-08-17",
+      "window": "2015-08-24 .. 2015-11-16",
+      "holiday": false,
+      "previous_year_clean": true,
+      "kept": true
+    },
+    {
+      "origin": "2015-05-18",
+      "window": "2015-05-25 .. 2015-08-17",
+      "holiday": false,
+      "previous_year_clean": true,
+      "kept": true
+    },
+    {
+      "origin": "2015-02-16",
+      "window": "2015-02-23 .. 2015-05-18",
+      "holiday": false,
+      "previous_year_clean": false,
+      "kept": true
+    }
+  ]
+}
